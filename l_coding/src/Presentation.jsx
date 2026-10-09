@@ -38,14 +38,15 @@ const dbscan = (pts, eps, min) => {
   let c = 0;
   for (let i = 0; i < n; i++) {
     if (lab[i] !== -1 || !core[i]) continue;
-    const st = [i]; lab[i] = c;
-    while (st.length) nb[st.pop()].forEach((j) => { if (lab[j] === -1) { lab[j] = c; if (core[j]) st.push(j); } });
+    const cluster = c, st = [i]; lab[i] = cluster;
+    while (st.length) nb[st.pop()].forEach((j) => { if (lab[j] === -1) { lab[j] = cluster; if (core[j]) st.push(j); } });
     c++;
   }
   return pts.map((p, i) => ({ ...p, c: lab[i], t: lab[i] === -1 ? "noise" : core[i] ? "core" : "border" }));
 };
 const blobs4 = blobs([[2, 2], [8, 3], [5, 8], [10, 9]], 35, 0.9, 11);
 const blobs3 = blobs([[2, 2], [8, 3], [5, 8]], 30, 0.9, 5);
+const kmeansInit = [blobs3[0], blobs3[5], blobs3[70]];
 const byLabel = (pts, l, k, extra = {}) =>
   Array.from({ length: k }, (_, i) => ({ name: `Cluster ${i + 1}`, color: C[i], data: pts.filter((_, j) => l[j] === i), ...extra }));
 const inertia = [1200, 540, 210, 170, 142, 125, 112, 102, 94, 88].map((v, i) => ({ k: i + 1, inertia: v }));
@@ -134,12 +135,11 @@ const S1 = () => (
 
 const S2 = () => {
   const [st, setSt] = useState(0);
-  const init = [blobs3[0], blobs3[5], blobs3[70]];
-  const l1 = useMemo(() => assign(blobs3, init), []);
-  const c1 = useMemo(() => update(blobs3, l1, init), []);
-  const fin = useMemo(() => kmeans(blobs3, init), []);
+  const l1 = useMemo(() => assign(blobs3, kmeansInit), []);
+  const c1 = useMemo(() => update(blobs3, l1, kmeansInit), [l1]);
+  const fin = useMemo(() => kmeans(blobs3, kmeansInit), []);
   const names = ["Initialisation", "Attribution", "Recalcul", "Convergence"];
-  const labels = [null, l1, l1, fin.l][st], cents = [init, init, c1, fin.cs][st];
+  const labels = [null, l1, l1, fin.l][st], cents = [kmeansInit, kmeansInit, c1, fin.cs][st];
   const series = labels ? byLabel(blobs3, labels, 3) : [{ name: "Points", color: GREY, data: blobs3 }];
   series.push({ name: "Centroïdes", color: "#0f172a", op: 1, shape: "star", data: cents });
   const steps = ["Choisir K", "Initialiser K centroïdes", "Affecter au centroïde le plus proche", "Recalculer les centroïdes", "Répéter jusqu'à convergence"];
@@ -260,7 +260,6 @@ const S5 = () => {
   );
 };
 
-const typeStyle = { core: ["Core", 1, "circle"], border: ["Border", 0.4, "diamond"] };
 const S6 = () => {
   const [eps, setEps] = useState(1.0), [min, setMin] = useState(5);
   const res = useMemo(() => dbscan(moons, eps, min), [eps, min]);
